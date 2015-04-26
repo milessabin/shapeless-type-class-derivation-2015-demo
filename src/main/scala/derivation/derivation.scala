@@ -14,9 +14,19 @@
  * limitations under the License.
  */
 
-package scaladays
+package derivation
 
 import shapeless._
+
+object repr extends ShowReprDefns {
+
+  sealed trait Animal
+  case class Cat(name: String, fish: Int) extends Animal
+  case class Dog(name: String, bones: Int) extends Animal
+
+  val felix: Animal = Cat("Felix", 1)
+  val tigger: Animal = Dog("Tigger", 2)
+}
 
 object equalManual {
   // Cats/Algebra Eq
@@ -35,7 +45,7 @@ object equalManual {
         def eqv(x: String, y: String): Boolean = x == y
       }
   }
-  
+
   implicit class EqOps[T](x: T)(implicit eqT: Eq[T]) {
     def ===(y: T): Boolean = eqT.eqv(x, y)
   }
@@ -110,7 +120,7 @@ object equal {
 
     // Induction step for products
     implicit def eqHCons[H, T <: HList]
-      (implicit 
+      (implicit
         eqH: Lazy[Eq[H]],
         eqT: Lazy[Eq[T]]
       ): Eq[H :: T] =
@@ -126,7 +136,7 @@ object equal {
 
     // Induction step for products
     implicit def eqCNCons[H, T <: Coproduct]
-      (implicit 
+      (implicit
         eqH: Lazy[Eq[H]],
         eqT: Lazy[Eq[T]]
       ): Eq[H :+: T] =
@@ -139,7 +149,7 @@ object equal {
             }
         }
   }
-  
+
   implicit class EqOps[T](x: T)(implicit eqT: Eq[T]) {
     def ===(y: T): Boolean = eqT.eqv(x, y)
   }
@@ -186,7 +196,7 @@ object ordering {
 
     // Induction step for products
     implicit def ordHCons[H, T <: HList]
-      (implicit 
+      (implicit
         ordH: Lazy[Order[H]],
         ordT: Lazy[Order[T]]
       ): Order[H :: T] =
@@ -204,7 +214,7 @@ object ordering {
 
     // Induction step for products
     implicit def ordCNCons[H, T <: Coproduct]
-      (implicit 
+      (implicit
         ordH: Lazy[Order[H]],
         ordT: Lazy[Order[T]]
       ): Order[H :+: T] =
@@ -218,7 +228,7 @@ object ordering {
             }
         }
   }
-  
+
   implicit class OrderOps[T](x: T)(implicit ordT: Order[T]) {
     def compare(y: T): Int = ordT.compare(x, y)
   }
@@ -284,7 +294,7 @@ object monoid {
 
     // Induction step for products
     implicit def monHCons[H, T <: HList]
-      (implicit 
+      (implicit
         monH: Lazy[Monoid[H]],
         monT: Lazy[Monoid[T]]
       ): Monoid[H :: T] =
@@ -592,4 +602,62 @@ object foldable {
   final case class INil[A]() extends IList[A]
 
   val list = (1 to 100000).foldLeft(ICons(0, INil())){ (acc, i) => ICons(i, acc) }
+}
+
+trait ShowReprDefns {
+  def showRepr[T](t: T)(implicit st: ShowRepr[T]): String = st(t)
+
+  trait ShowRepr[T] {
+    def apply(t: T): String
+  }
+
+  object ShowRepr extends ShowRepr0 {
+    implicit val hnilShowRepr: ShowRepr[HNil] =
+      new ShowRepr[HNil] {
+        def apply(t: HNil): String = "HNil"
+      }
+
+    implicit def hconsShowRepr[H, T <: HList]
+      (implicit
+        sh: Lazy[ShowRepr[H]],
+        st: Lazy[ShowRepr[T]]
+      ): ShowRepr[H :: T] =
+      new ShowRepr[H :: T] {
+        def apply(t: H :: T): String = sh.value(t.head)+" :: "+st.value(t.tail)
+      }
+
+    implicit val cnilShowRepr: ShowRepr[CNil] =
+      new ShowRepr[CNil] {
+        def apply(t: CNil): String = "CNil"
+      }
+
+    implicit def cconsShowRepr[H, T <: Coproduct]
+      (implicit
+        sh: Lazy[ShowRepr[H]],
+        st: Lazy[ShowRepr[T]]
+      ): ShowRepr[H :+: T] =
+      new ShowRepr[H :+: T] {
+        def apply(t: H :+: T): String =
+          t match {
+            case Inl(l) => "Inl("+sh.value(l)+")"
+            case Inr(r) => "Inr("+st.value(r)+")" 
+          }
+      }
+
+    implicit def genShowRepr[T, R]
+      (implicit
+        gen: Generic.Aux[T, R],
+        sr: Lazy[ShowRepr[R]]
+      ): ShowRepr[T] =
+      new ShowRepr[T] {
+        def apply(t: T): String = sr.value(gen.to(t))
+      }
+  }
+  
+  trait ShowRepr0 {
+    implicit def default[T]: ShowRepr[T] =
+      new ShowRepr[T] {
+        def apply(t: T): String = t.toString
+      }
+  }
 }
