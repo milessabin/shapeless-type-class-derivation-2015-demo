@@ -9,7 +9,7 @@ scalaVersion := "2.11.6"
 resolvers += Resolver.sonatypeRepo("releases")
 
 libraryDependencies ++= Seq(
-  "com.chuusai" %% "shapeless" % "2.2.0-RC4"
+  "com.chuusai" %% "shapeless" % "2.2.1"
 )
 
 initialCommands in console := """import shapeless._, derivation._"""
