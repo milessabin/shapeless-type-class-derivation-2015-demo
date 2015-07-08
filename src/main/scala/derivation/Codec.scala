@@ -11,7 +11,19 @@ trait Codec[T] {
   def deserialize(s: String): Option[T]
 }
 
+object syntax {
+
+  class CodecOps[T](t: T)(implicit codec: Codec[T]) {
+    def serialize(): String = codec.serialize(t)
+  }
+
+  implicit def conversion[T](t: T): CodecOps[T] = new CodecOps[T](t)
+}
+
 object Codec {
+
+  def apply[T](implicit c: Codec[T]): Codec[T] = c
+
   implicit def intCodec: Codec[Int] = new Codec[Int] {
     override def serialize(t: Int): String = t.toString
 
@@ -54,46 +66,76 @@ object Codec {
       codecT.value.serialize(t.tail) + ")"
 
     override def deserialize(s: String): Option[H :: T] = {
-      if (s.startsWith("(") && s.endsWith(")")) {
-        val str = s.stripPrefix("(").stripSuffix(")")
-        val index = str.indexOf(", ")
-        if (index >= 0) {
-          val head = str.substring(0, index)
-          val tail = str.substring(index + 2)
-
-          for {
-            h <- codecH.value.deserialize(head)
-            t <- codecT.value.deserialize(tail)
-          } yield h :: t
-        }
-        else {
-          None
-        }
-      }
-      else None
-
-
+      val Pattern = """\((.+?), (.+?)\)""".r
+      for {
+        Pattern(head, tail) <- Option(s)
+        h <- codecH.value.deserialize(head)
+        t <- codecT.value.deserialize(tail)
+      } yield h :: t
     }
   }
+
+  implicit def codeCCons[H, T <: Coproduct]
+  (implicit
+     codecH: Lazy[Codec[H]],
+     codecT: Lazy[Codec[T]]
+    ): Codec[H :+: T] =
+      new Codec[H :+: T] {
+        def serialize(x: H :+: T): String = x match {
+          case Inl(head) => "Left{" + codecH.value.serialize(head) + "}"
+          case Inr(tail) => "Right{" + codecT.value.serialize(tail) + "}"
+        }
+
+        override def deserialize(s: String): Option[H :+: T] = {
+          val LeftPattern = """Left\{(.+)\}""".r
+          val RightPattern = """Right\{(.+)\}""".r
+          s match {
+            case LeftPattern(left) => codecH.value.deserialize(left).map(x => Inl(x))
+            case RightPattern(right) => codecT.value.deserialize(right).map(y => Inr(y))
+            case _ => None
+          }
+        }
+      }
+
 }
+
+sealed trait TeamMember
+
+case class Todd(breakfast: String, waketime: Int) extends TeamMember
+case class Soila(lunch: String, bedtime: Int) extends TeamMember
+case class Joyesh(naptime: Int) extends TeamMember
 
 
 case class TestClass(i: Int, s: String)
 
 object Test extends App {
-  val codec = implicitly[Codec[Int]]
-  val codecStr = implicitly[Codec[String]]
-  implicitly[Generic[TestClass]]
-  implicitly[Codec[HNil]]
-  implicitly[Codec[String :: HNil]]
-  implicitly[Codec[Int :: String :: HNil]]
-  val codec1 = implicitly[Codec[TestClass]]
+  import syntax._
 
-  val y = codec1.deserialize(codec1.serialize(TestClass(1, "cat")))
-  println(codec1.deserialize("DAGs"))
+
+  def serialize[T](t: T)(implicit codec: Codec[T]): String = codec.serialize(t)
+  def deserialize[T](s: String)(implicit codec: Codec[T]): Option[T] = codec.deserialize(s)
+
+//  val codec = Codec[Int]
+//  val codecStr = Codec[String]
+//  Generic[TestClass]
+//  Codec[HNil]
+//  Codec[String :: HNil]
+//  Codec[Int :: String :: HNil]
+//  val codec1 = Codec[TestClass]
+//  val codecTeam = Codec[TeamMember]
+
+  val y = deserialize[TestClass](serialize(TestClass(1, "cat")))
   println(y)
+  println(deserialize[TestClass]("DAGs"))
 
-  assert(codec.deserialize(codec.serialize(5)) == Some(5))
+  val todd: TeamMember = Joyesh(12)
+  val sTodd =serialize(todd)
+  println (s"sTodd=$sTodd")
+  val t = deserialize[TeamMember](serialize(Todd("yogurt", 7):TeamMember))
+  println(t)
+  println(Soila("burger", 12).serialize)
+
+  //assert(codec.deserialize(codec.serialize(5)) == Some(5))
 
 }
 
