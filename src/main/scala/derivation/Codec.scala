@@ -13,11 +13,11 @@ trait Codec[T] {
 
 object syntax {
 
-  class CodecOps[T](t: T)(implicit codec: Codec[T]) {
+  implicit class CodecOps[T](t: T)(implicit codec: Codec[T]) {
     def serialize(): String = codec.serialize(t)
   }
 
-  implicit def conversion[T](t: T): CodecOps[T] = new CodecOps[T](t)
+  //implicit def conversion[T](t: T): CodecOps[T] = new CodecOps[T](t)
 }
 
 object Codec {
