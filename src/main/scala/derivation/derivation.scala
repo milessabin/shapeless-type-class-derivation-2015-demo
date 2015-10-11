@@ -134,7 +134,7 @@ object equal {
       def eqv(x: CNil, y: CNil): Boolean = true
     }
 
-    // Induction step for products
+    // Induction step for coproducts
     implicit def eqCNCons[H, T <: Coproduct]
       (implicit
         eqH: Lazy[Eq[H]],
@@ -212,7 +212,7 @@ object ordering {
       def compare(x: CNil, y: CNil): Int = 0
     }
 
-    // Induction step for products
+    // Induction step for coproducts
     implicit def ordCNCons[H, T <: Coproduct]
       (implicit
         ordH: Lazy[Order[H]],
